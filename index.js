@@ -14,40 +14,51 @@ function escapeHtml(s) {
 }
 
 function judge(user, cpu) {
-  if (user === cpu) return 'あいこ';
+  if (user === cpu) return 'draw';
   if (
     (user === 'グー' && cpu === 'チョキ') ||
     (user === 'チョキ' && cpu === 'パー') ||
     (user === 'パー' && cpu === 'グー')
   ) {
-    return 'あなたの勝ち！';
+    return 'win';
   }
-  return 'あなたの負け…';
+  return 'lose';
 }
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost:' + port);
   const choice = url.searchParams.get('hand');
+  const isAikode = url.searchParams.get('aikode') === '1';
 
   let resultHtml = '<p class="lead">大きな絵文字ボタンを押して、じゃんけんを始めましょう！</p>';
-  let outcomeClass = '';
+  let nextAikode = false;
+  const headingText = isAikode ? 'あいこで…！' : 'じゃんけんWebアプリ';
+  const subtitleText = isAikode ? '「あいこで〜、しょっ！」好きな手を選んでね' : '相手と一発勝負！好きな手を選んでね';
 
   if (hands.includes(choice)) {
     const cpu = hands[Math.floor(Math.random() * hands.length)];
     const outcome = judge(choice, cpu);
+    const prefix = isAikode ? 'あいこで ' : '';
 
-    if (outcome.includes('勝ち')) {
-      outcomeClass = 'win';
-    } else if (outcome.includes('負け')) {
-      outcomeClass = 'lose';
+    if (outcome === 'win') {
+      resultHtml =
+        '<p class="picks">あなた：<strong>' + escapeHtml(choice) + '</strong> ／ 相手：<strong>' + escapeHtml(cpu) + '</strong></p>' +
+        '<p class="outcome win">' + prefix + 'あなたの勝ち！</p>';
+      nextAikode = false;
+    } else if (outcome === 'lose') {
+      resultHtml =
+        '<p class="picks">あなた：<strong>' + escapeHtml(choice) + '</strong> ／ 相手：<strong>' + escapeHtml(cpu) + '</strong></p>' +
+        '<p class="outcome lose">' + prefix + 'あなたの負け…</p>';
+      nextAikode = false;
     } else {
-      outcomeClass = 'draw';
+      resultHtml =
+        '<p class="picks">あなた：<strong>' + escapeHtml(choice) + '</strong> ／ 相手：<strong>' + escapeHtml(cpu) + '</strong></p>' +
+        '<p class="outcome draw">あいこで…！もう一回手を選んでね</p>';
+      nextAikode = true;
     }
-
-    resultHtml =
-      '<p class="picks">あなた：<strong>' + escapeHtml(choice) + '</strong> ／ 相手：<strong>' + escapeHtml(cpu) + '</strong></p>' +
-      '<p class="outcome ' + outcomeClass + '">結果：' + escapeHtml(outcome) + '</p>';
   }
+
+  const aikodeInputHtml = nextAikode ? '<input type="hidden" name="aikode" value="1">' : '';
 
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
   res.end(`<!DOCTYPE html>
@@ -155,26 +166,33 @@ const server = http.createServer((req, res) => {
         color: #334155;
       }
       .outcome {
+        display: inline-block;
         font-size: 24px;
         font-weight: 800;
-        margin: 10px 0 0;
+        margin: 12px 0 0;
+        padding: 6px 14px;
+        border-radius: 10px;
       }
       .outcome.win {
-        color: #16a34a;
+        color: #dc2626;
+        background: #fef2f2;
       }
       .outcome.lose {
-        color: #dc2626;
+        color: #2563eb;
+        background: #eff6ff;
       }
       .outcome.draw {
-        color: #d97706;
+        color: #facc15;
+        background: #1e293b;
       }
     </style>
   </head>
   <body>
     <div class="card">
-      <h1>じゃんけんWebアプリ</h1>
-      <p class="subtitle">相手と一発勝負！好きな手を選んでね</p>
+      <h1>${escapeHtml(headingText)}</h1>
+      <p class="subtitle">${escapeHtml(subtitleText)}</p>
       <form method="GET" action="/" class="btns">
+        ${aikodeInputHtml}
         <button type="submit" name="hand" value="グー" class="hand-btn rock">
           <span class="emoji">✊</span>
           <span class="label">グー</span>
